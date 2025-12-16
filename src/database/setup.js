@@ -8,11 +8,7 @@ const db = await mysql.createPool({
     host: 'localhost',
     user: 'root',
     password: '123',
-    port: 3306,
-    waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  socketPath: '/data/data/com.termux/files/usr/tmp/mysql.sock' 
+    port: 3306
 })
 
 export async function Setupdb() {
