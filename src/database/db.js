@@ -5,5 +5,5 @@ export const db = mysql.createPool({
     user: 'root',
     password: '123',
     database: 'bot_tele',
-    port: 3307
+    port: 3306
 })

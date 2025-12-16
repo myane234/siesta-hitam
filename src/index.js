@@ -3,17 +3,13 @@ import { db } from "./database/db.js";
 import { Setupdb } from "./database/setup.js";
 
 const TOKEN = "";
-const CHAT_ID = "7682199035"; // wajib untuk notif otomatis
+const CHAT_ID = "7682199035"; 
 
 async function start() {
   await Setupdb();
 
   const bot = new TelegramBot(TOKEN, { polling: true });
   console.log("🤖 Bot NoFap jalan...");
-
-  /* ===============================
-     HELPER (ASYNC)
-  ================================ */
 
   async function getStatus() {
     const [rows] = await db.query(`

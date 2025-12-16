@@ -8,7 +8,7 @@ const db = await mysql.createPool({
     host: 'localhost',
     user: 'root',
     password: '123',
-    port: 3307
+    port: 3306
 })
 
 export async function Setupdb() {
