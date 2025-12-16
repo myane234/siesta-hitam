@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 /* ===============================
-   PATH FIX (WAJIB)
+   PATH FIX
 ================================ */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,13 +14,23 @@ const DATA_FILE = path.join(__dirname, "nofap.json");
    CONFIG
 ================================ */
 const TOKEN = ""; // ISI TOKEN BOT
-const CHAT_ID = "7682199035"; // chat id lu
+const CHAT_ID = "7682199035";
 
-const bot = new TelegramBot(TOKEN, { polling: true });
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled:", err.message);
+});
+
+const bot = new TelegramBot(TOKEN, {
+  polling: {
+    interval: 3000,
+    params: { timeout: 10 },
+  },
+});
+
 console.log("🤖 Bot NoFap (JSON) jalan...");
 
 /* ===============================
-   HELPER JSON
+   HELPER
 ================================ */
 async function readData() {
   const data = await fs.readFile(DATA_FILE, "utf-8");
@@ -36,38 +46,53 @@ function today() {
 }
 
 function diffDays(start) {
+  if (!start) return 0;
   const startDate = new Date(start);
   const now = new Date();
   return Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
 }
 
 /* ===============================
-   NOFAP LOGIC
+   NOFAP LOGIC (FIXED)
 ================================ */
 async function getStatus() {
   const data = await readData();
   return {
-    streak: diffDays(data.start_date),
+    name: data.name,
+    is_active: data.is_active,
+    streak: data.is_active ? diffDays(data.start_date) : 0,
     total_days: data.total_days,
   };
 }
 
-async function startNoFap() {
+async function startNoFap(name) {
   const data = await readData();
+
+  if (data.is_active) {
+    return { ok: false, name: data.name };
+  }
+
+  if (name) data.name = name;
+
+  data.is_active = true;
   data.start_date = today();
   await writeData(data);
+
+  return { ok: true, name: data.name };
 }
 
 async function relapse() {
   const data = await readData();
-  const streak = diffDays(data.start_date);
 
+  if (!data.is_active) return null;
+
+  const streak = diffDays(data.start_date);
   data.total_days += streak;
   data.last_relapse = today();
   data.start_date = today();
 
   await writeData(data);
-  return streak;
+  return { streak, name: data.name, total: data.total_days };
 }
 
 /* ===============================
@@ -86,19 +111,19 @@ function menuKeyboard() {
 }
 
 /* ===============================
-   COMMAND HANDLER (TEXT)
+   COMMAND HANDLER
 ================================ */
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text?.toLowerCase();
+  const text = msg.text?.trim();
   if (!text) return;
 
   try {
-    if (text === "/halo" || text === "/start") {
+    if (text === "/start" || text === "/halo") {
       return bot.sendMessage(
         chatId,
-        "👋 Halo! Bot NoFap aktif.\n\nPilih menu di bawah 👇",
-        menuKeyboard()
+        "👋 *Bot NoFap Aktif*\n\nGunakan menu di bawah 👇",
+        { parse_mode: "Markdown", ...menuKeyboard() }
       );
     }
 
@@ -109,103 +134,121 @@ bot.on("message", async (msg) => {
       });
     }
 
-    if (text === "/startnofap") {
-      await startNoFap();
-      return bot.sendMessage(chatId, "🔥 NoFap dimulai hari ini. Tetap kuat 💪");
+    if (text.startsWith("/startnofap")) {
+      const name = text.split(" ")[1];
+      const result = await startNoFap(name);
+
+      if (!result.ok) {
+        return bot.sendMessage(
+          chatId,
+          `⚠️ NoFap sudah aktif.\nTetap kuat *${result.name}* 💪`,
+          { parse_mode: "Markdown" }
+        );
+      }
+
+      return bot.sendMessage(
+        chatId,
+        `🔥 *NoFap dimulai!*\n\n` +
+          `👤 Nama: *${result.name}*\n` +
+          `📆 Hari pertama dimulai hari ini\n\n` +
+          `Tetap kuat 💪`,
+        { parse_mode: "Markdown" }
+      );
     }
 
     if (text === "/status") {
       const data = await getStatus();
       return bot.sendMessage(
         chatId,
-        `🔥 *NoFap Status*\n\n` +
+        `🔥 *Status NoFap*\n\n` +
+          `👤 Nama: *${data.name}*\n` +
           `📆 Streak: *${data.streak} hari*\n` +
-          `🧮 Total bersih: *${data.total_days} hari*`,
+          `🧮 Total bersih: *${data.total_days} hari*\n\n` +
+          `Terus maju ${data.name} 💪`,
         { parse_mode: "Markdown" }
       );
     }
 
     if (text === "/gagal") {
-      const streak = await relapse();
-      const data = await getStatus();
+      const res = await relapse();
+      if (!res) {
+        return bot.sendMessage(chatId, "⚠️ NoFap belum dimulai.");
+      }
 
       return bot.sendMessage(
         chatId,
         `❌ *Relapse dicatat*\n\n` +
-          `🔥 Streak terakhir: *${streak} hari*\n` +
-          `🧮 Total sekarang: *${data.total_days} hari*\n\n` +
-          `Mulai lagi hari ini 💪`,
+          `🔥 Streak terakhir: *${res.streak} hari*\n` +
+          `🧮 Total bersih: *${res.total} hari*\n\n` +
+          `Bangkit lagi ${res.name} 💪`,
         { parse_mode: "Markdown" }
       );
     }
-  } catch (err) {
-    console.error("BOT ERROR:", err.message);
-    bot.sendMessage(chatId, "❌ Terjadi error. Cek console.");
+  } catch (e) {
+    console.error("BOT ERROR:", e.message);
   }
 });
 
 /* ===============================
-   CALLBACK BUTTON HANDLER
+   BUTTON HANDLER
 ================================ */
-bot.on("callback_query", async (query) => {
-  const chatId = query.message.chat.id;
-  const action = query.data;
+bot.on("callback_query", async (q) => {
+  const chatId = q.message.chat.id;
 
   try {
-    if (action === "startnofap") {
-      await startNoFap();
-      bot.sendMessage(chatId, "🔥 NoFap dimulai hari ini. Tetap kuat 💪");
-    }
-
-    if (action === "status") {
-      const data = await getStatus();
-      bot.sendMessage(
+    if (q.data === "startnofap") {
+      const res = await startNoFap();
+      return bot.sendMessage(
         chatId,
-        `🔥 *NoFap Status*\n\n` +
-          `📆 Streak: *${data.streak} hari*\n` +
-          `🧮 Total bersih: *${data.total_days} hari*`,
+        res.ok
+          ? `🔥 NoFap dimulai! Semangat *${res.name}* 💪`
+          : `⚠️ NoFap sudah aktif. Tetap kuat *${res.name}* 💪`,
         { parse_mode: "Markdown" }
       );
     }
 
-    if (action === "gagal") {
-      const streak = await relapse();
-      const data = await getStatus();
-
-      bot.sendMessage(
+    if (q.data === "status") {
+      const d = await getStatus();
+      return bot.sendMessage(
         chatId,
-        `❌ *Relapse dicatat*\n\n` +
-          `🔥 Streak terakhir: *${streak} hari*\n` +
-          `🧮 Total sekarang: *${data.total_days} hari*\n\n` +
-          `Mulai lagi hari ini 💪`,
+        `🔥 *Status NoFap*\n\n` +
+          `👤 ${d.name}\n` +
+          `📆 ${d.streak} hari\n` +
+          `🧮 Total: ${d.total_days} hari`,
         { parse_mode: "Markdown" }
       );
     }
 
-    // wajib acknowledge callback
-    bot.answerCallbackQuery(query.id);
+    if (q.data === "gagal") {
+      const r = await relapse();
+      if (!r) return;
+      return bot.sendMessage(
+        chatId,
+        `❌ Relapse\n🔥 ${r.streak} hari\n🧮 Total ${r.total} hari\n\nBangkit lagi ${r.name} 💪`
+      );
+    }
+
+    bot.answerCallbackQuery(q.id);
   } catch (e) {
     console.error("CALLBACK ERROR:", e.message);
   }
 });
 
 /* ===============================
-   NOTIF OTOMATIS (12 SIANG)
+   DAILY REMINDER
 ================================ */
 setInterval(async () => {
   const now = new Date();
   if (now.getHours() !== 12) return;
 
   try {
-    const data = await getStatus();
+    const d = await getStatus();
+    if (!d.is_active) return;
+
     await bot.sendMessage(
       CHAT_ID,
-      `⏰ *Daily NoFap Check*\n\n` +
-        `🔥 Streak hari ini: *${data.streak} hari*\n` +
-        `💪 Tetap kuat, jangan kalah.`,
+      `⏰ *Daily Check*\n\n🔥 ${d.streak} hari\nTetap kuat ${d.name} 💪`,
       { parse_mode: "Markdown" }
     );
-  } catch (e) {
-    console.error("Notif error:", e.message);
-  }
+  } catch {}
 }, 60 * 60 * 1000);
