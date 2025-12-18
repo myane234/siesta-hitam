@@ -97,26 +97,32 @@ async function start() {
      NOTIF OTOMATIS (SIANG)
   ================================ */
 
-  setInterval(async () => {
-    const now = new Date();
-    const hour = now.getHours();
+  const SEND_HOURS = [6, 10, 14, 18, 20];
+let lastSentHour = null;
 
-    // kirim jam 12 siang
-    if (hour !== 12) return;
+setInterval(async () => {
+  const now = new Date();
+  const hour = now.getHours();
+  if (hour < 6) return;
 
-    try {
-      const data = await getStatus();
-      await bot.sendMessage(
-        CHAT_ID,
-        `⏰ *Daily NoFap Check*\n\n` +
-        `🔥 Streak hari ini: *${data.streak} hari*\n` +
-        `💪 Tetap kuat, jangan kalah.`,
-        { parse_mode: "Markdown" }
-      );
-    } catch (e) {
-      console.error("Notif error:", e.message);
-    }
-  }, 60 * 60 * 1000); // cek tiap 1 jam
-}
+  if (!SEND_HOURS.includes(hour)) return;
+
+  if (lastSentHour === hour) return;
+
+  try {
+    const data = await getStatus();
+    await bot.sendMessage(
+      CHAT_ID,
+      `⏰ *Daily NoFap Check*\n\n` +
+      `🔥 Streak hari ini: *${data.streak} hari*\n` +
+      `💪 Tetap kuat, jangan kalah.`,
+      { parse_mode: "Markdown" }
+    );
+
+    lastSentHour = hour;
+  } catch (e) {
+    console.error("Notif error:", e.message);
+  }
+}, 60 * 1000);
 
 start();
