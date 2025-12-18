@@ -237,18 +237,34 @@ bot.on("callback_query", async (q) => {
 /* ===============================
    DAILY REMINDER
 ================================ */
+const SEND_HOURS = [6, 10, 14, 18, 20];
+let lastSentHour = null;
+
 setInterval(async () => {
   const now = new Date();
-  if (now.getHours() !== 12) return;
+  const hour = now.getHours();
+
+  // ❌ blok jam tidur
+  if (hour < 6) return;
+
+  // ❌ bukan jam target
+  if (!SEND_HOURS.includes(hour)) return;
+
+  // ❌ anti spam dalam jam yang sama
+  if (lastSentHour === hour) return;
 
   try {
-    const d = await getStatus();
-    if (!d.is_active) return;
-
+    const data = await getStatus();
     await bot.sendMessage(
       CHAT_ID,
-      `⏰ *Daily Check*\n\n🔥 ${d.streak} hari\nTetap kuat ${d.name} 💪`,
+      `⏰ *Daily NoFap Check*\n\n` +
+      `🔥 Streak hari ini: *${data.streak} hari*\n` +
+      `💪 Tetap kuat, jangan kalah.`,
       { parse_mode: "Markdown" }
     );
-  } catch {}
-}, 60 * 60 * 1000);
+
+    lastSentHour = hour;
+  } catch (e) {
+    console.error("Notif error:", e.message);
+  }
+}, 60 * 1000); // cek tiap menit
