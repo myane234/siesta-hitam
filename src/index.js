@@ -13,7 +13,7 @@ const DATA_FILE = path.join(__dirname, "nofap.json");
 /* ===============================
    CONFIG
 ================================ */
-const TOKEN = ""; // ISI TOKEN BOT
+const TOKEN = "7848366747:AAG2ENj37GzV5S0JzCuup-vAwfbppxxWp1A"; // ISI TOKEN BOT
 const CHAT_ID = "7682199035";
 
 process.on("unhandledRejection", (err) => {
